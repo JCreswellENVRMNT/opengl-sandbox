@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(OpenGLSandbox)
-
 set(CMAKE_CXX_STANDARD 14)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DDEBUG)
+endif()
 find_package(OpenGL REQUIRED)
 message(STATUS "opengl lib given as ${OPENGL_LIBRARY}")
 if("${GLFW_PATH}" STREQUAL "")
