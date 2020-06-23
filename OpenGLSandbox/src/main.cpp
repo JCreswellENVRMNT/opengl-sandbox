@@ -155,6 +155,55 @@ unsigned int loadShaders(const std::string& programName)
     return shaderProgramId;
 }
 
+/**
+ * Performs the OpenGL Dance necessary to configure a vertex array object
+ * describing usage of a vertex buffer object which in turn holds vertex data
+ * for a simple tightly packed single triangle.
+ * @return the ID of the vertex array object that can be bound at a later time for rendering use
+ */
+unsigned int generateBasicTriangleVAO()
+{
+    // Config Step 1: create vertex array object to track our config
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    // Config Step 2: define and buffer data
+    // raw tri data, using device coords directly
+    float vertices[] = {
+            -0.5f, -0.5f, 0.0f,
+            0.5f, -0.5f, 0.0f,
+            0.0f,  0.5f, 0.0f
+    };
+
+    // generate a vertex buffer object to manage our vertices in GPU memory
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+
+    // bind our manager VBO to the appropriate type of GPU buffer,
+    // which for vertex buffer is GL_ARRAY_BUFFER
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    // upload vertex data to the GPU memory buffer we're working with,
+    // specifying its size in bytes, the data itself as float array, and
+    // finally a constant indicating how often we expect drawable data to change;
+    // since we're rendering a static triangle for now, static is fine.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
+    // 0 is the location we specified for our aPos attribute in basic_triangle.vert
+    glVertexAttribPointer(
+            0,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            3 * sizeof(float),
+            (void*)nullptr
+    );
+    glEnableVertexAttribArray(0);
+    return VAO;
+}
+
 int main()
 {
     // todo: add Google Test unit test support; it would be great if we
@@ -200,6 +249,9 @@ int main()
     unsigned int shaderProgramId = loadShaders(shaderProgramName);
     assert(shaderProgramId > 0);
 
+    // Config Step 4: generate/configure our VAO
+    unsigned int basicTriangleVAO = generateBasicTriangleVAO();
+
     // render loop
     while(!glfwWindowShouldClose(window))
     {
@@ -210,56 +262,14 @@ int main()
         glfwPollEvents();
 
         // rendering code
+        // Render Step 1: clear screen
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-
-        // todo: not all of this needs to be/should be in the render loop
-        // Step 0: create vertex array object to track our config
-        unsigned int VAO;
-        glGenVertexArrays(1, &VAO);
-        glBindVertexArray(VAO);
-
-        // Step 1: define and buffer data
-        // raw tri data, using device coords directly
-        float vertices[] = {
-                -0.5f, -0.5f, 0.0f,
-                0.5f, -0.5f, 0.0f,
-                0.0f,  0.5f, 0.0f
-        };
-
-        // generate a vertex buffer object to manage our vertices in GPU memory
-        unsigned int VBO;
-        glGenBuffers(1, &VBO);
-
-        // bind our manager VBO to the appropriate type of GPU buffer,
-        // which for vertex buffer is GL_ARRAY_BUFFER
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-        // upload vertex data to the GPU memory buffer we're working with,
-        // specifying its size in bytes, the data itself as float array, and
-        // finally a constant indicating how often we expect drawable data to change;
-        // since we're rendering a static triangle for now, static is fine.
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-        // Step 2: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
-        // 0 is the location we specified for our aPos attribute in basic_triangle.vert
-        glVertexAttribPointer(
-                0,
-                3,
-                GL_FLOAT,
-                GL_FALSE,
-                3 * sizeof(float),
-                (void*)nullptr
-        );
-        glEnableVertexAttribArray(0);
-
-        // Step 3: select shader program to use
+        // Render Step 2: select shader program to use
         glUseProgram(shaderProgramId);
-
-        // Step 4: bind the configured VAO
-        glBindVertexArray(VAO);
-
-        // Step 5: draw calls
+        // Render Step 3: bind the configured VAO
+        glBindVertexArray(basicTriangleVAO);
+        // Render Step 4: draw calls
         // specify primitve type triangles and that we want to render
         // vertices starting at index 0 and rendering a total count of 3 vertices
         glDrawArrays(GL_TRIANGLES, 0, 3);
