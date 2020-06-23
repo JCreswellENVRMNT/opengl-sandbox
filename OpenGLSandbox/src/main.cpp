@@ -289,6 +289,81 @@ unsigned int generateUniqueVertsRectangleVAO()
     return VAO;
 }
 
+/**
+ * Performs the OpenGL Dance necessary to summon a vertex array object
+ * describing usage of an element buffer object which in turn holds vertex data
+ * for a tri-strip forming the triforce.
+ * @return the ID of the vertex array object that can be bound at a later time for rendering use
+ */
+unsigned int generateTriStripForceVAO()
+{
+    // Config Step 1: create vertex array object to track our config
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    // Config Step 2: define and buffer data
+    // raw rect data, using device coords directly;
+    // these are only the unique vertices of the two triangles!
+    float vertices[] = {
+            0, -1, 1,   // P0: bottom right of first tri and bottom left of third tri
+            -0.5, 0, 1, // P1: top of first tri and bottom left of second tri
+            -1, -1, 1,  // P2: bottom left of first tri
+            0.5, 0, 1,  // P3: bottom right of second tri and top of third tri
+            0, 1, 1,    // P4: top of second tri
+            1, -1, 1    // P5: bottom right of third tri
+    };
+    unsigned int indices[] = {
+            0, 1, 2,
+            3, 4, 1,
+            5, 3, 0
+    };
+
+    /// EBO, deals with indices above ///
+    // generate an element buffer object to manage our unique vertices in GPU memory
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+
+    // bind our manager EBO to the appropriate type of GPU buffer,
+    // which for element buffer is GL_ELEMENT_ARRAY_BUFFER
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+    // upload vertex data to the GPU memory buffer we're working with,
+    // specifying its size in bytes, the data itself as float array, and
+    // finally a constant indicating how often we expect drawable data to change;
+    // since we're rendering a static tri-strip for now, static is fine.
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    /// VBO, deals with vertices defined above ///
+    // generate a vertex buffer object to manage our vertices in GPU memory
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+
+    // bind our manager VBO to the appropriate type of GPU buffer,
+    // which for vertex buffer is GL_ARRAY_BUFFER
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    // upload vertex data to the GPU memory buffer we're working with,
+    // specifying its size in bytes, the data itself as float array, and
+    // finally a constant indicating how often we expect drawable data to change;
+    // since we're rendering a static tri-mesh for now, static is fine.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
+    // 0 is the location we specified for our aPos attribute in basic_render.vert
+    glVertexAttribPointer(
+            0,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            3 * sizeof(float),
+            (void*)nullptr
+    );
+    glEnableVertexAttribArray(0);
+
+    return VAO;
+}
+
 int main()
 {
     // todo: add Google Test unit test support; it would be great if we
@@ -338,7 +413,10 @@ int main()
     /*
     unsigned int basicTriangleVAO = generateBasicTriangleVAO();
     */
+    /*
     unsigned int unqiueVertsRectangleVAO = generateUniqueVertsRectangleVAO();
+    */
+    unsigned int tristripforceVAO = generateTriStripForceVAO();
 
     // render loop
     while(!glfwWindowShouldClose(window))
@@ -356,7 +434,7 @@ int main()
         // Render Step 2: select shader program to use
         glUseProgram(shaderProgramId);
         // Render Step 3: bind the configured VAO
-        glBindVertexArray(unqiueVertsRectangleVAO);
+        glBindVertexArray(tristripforceVAO);
         // Render Step 4: draw calls
         // specify primitive type triangles
         /* this is for a basic vertex data config, where every vertex is given in the needed order
@@ -365,9 +443,14 @@ int main()
          // and that we want to render vertices starting at index 0 and rendering a total count of 3 vertices
          glDrawArrays(GL_TRIANGLES, 0, 3);
         */
-        // and that we want to render 6 vertices in total, given by the 6 indices
+        /* unique vert rectangle
+        // and that we want to render 6 vertices in total (not just unique), given by the 6 indices
         // in our EBO which are of type unsigned int
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+        */
+        // and that we want to render 9 vertices in total (not just unique), given by the 9 indices
+        // in our EBO which are of type unsigned int
+        glDrawElements(GL_TRIANGLE_STRIP, 9, GL_UNSIGNED_INT, nullptr);
 
 #ifdef DEBUG
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
