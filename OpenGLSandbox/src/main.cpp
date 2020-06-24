@@ -192,6 +192,18 @@ unsigned int generateBasicTriangleVAO()
 
     // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
     // 0 is the location we specified for our aPos attribute in basic_render.vert
+    /*
+     * Note: Here's how the bridge between our VBO and our vertex attribute aPos works
+     * "
+     * Each vertex attribute takes its data from memory
+     * managed by a VBO and which VBO it takes its data from
+     * (you can have multiple VBOs) is determined by the VBO
+     * currently bound to GL_ARRAY_BUFFER when calling
+     * glVertexAttribPointer. Since the previously defined
+     * VBO is still bound before calling glVertexAttribPointer
+     * vertex attribute 0 is now associated with its vertex data.
+     * "
+     */
     glVertexAttribPointer(
             0,
             3,
@@ -347,7 +359,7 @@ unsigned int generateTriStripForceVAO()
     // specifying its size in bytes, the data itself as float array, and
     // finally a constant indicating how often we expect drawable data to change;
     // since we're rendering a static tri-mesh for now, static is fine.
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);//GL_STATIC_DRAW);
 
     // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
     // 0 is the location we specified for our aPos attribute in basic_render.vert
@@ -405,7 +417,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // create our program object and load vertex and fragment shaders into it
-    std::string shaderProgramName = "basic_render";
+    std::string shaderProgramName = "animated_render";
     unsigned int shaderProgramId = loadShaders(shaderProgramName);
     assert(shaderProgramId > 0);
 
@@ -417,6 +429,14 @@ int main()
     unsigned int unqiueVertsRectangleVAO = generateUniqueVertsRectangleVAO();
     */
     unsigned int tristripforceVAO = generateTriStripForceVAO();
+
+    int timeSpace = glGetUniformLocation(shaderProgramId, "time");
+    if(timeSpace < 0)
+    {
+        std::cerr << "failed to lookup location of uniform \"time\" in shader program "
+        << shaderProgramName << ". GL error code: " << glGetError() << std::endl;
+        return -1;
+    }
 
     // render loop
     while(!glfwWindowShouldClose(window))
@@ -433,6 +453,8 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // Render Step 2: select shader program to use
         glUseProgram(shaderProgramId);
+        // set shader program variables
+        glUniform1f(timeSpace, glfwGetTime());
         // Render Step 3: bind the configured VAO
         glBindVertexArray(tristripforceVAO);
         // Render Step 4: draw calls
