@@ -304,7 +304,8 @@ unsigned int generateUniqueVertsRectangleVAO()
 /**
  * Performs the OpenGL Dance necessary to summon a vertex array object
  * describing usage of an element buffer object which in turn holds vertex data
- * for a tri-strip forming the triforce.
+ * for a triforce in GL_TRIANGLES primitive mode and a triforce-ish thing
+ * in GL_TRIANGLE_STRIP primitive mode.
  * @return the ID of the vertex array object that can be bound at a later time for rendering use
  */
 unsigned int generateTriStripForceVAO()
@@ -344,7 +345,7 @@ unsigned int generateTriStripForceVAO()
     // specifying its size in bytes, the data itself as float array, and
     // finally a constant indicating how often we expect drawable data to change;
     // since we're rendering a static tri-strip for now, static is fine.
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
 
     /// VBO, deals with vertices defined above ///
     // generate a vertex buffer object to manage our vertices in GPU memory
@@ -362,7 +363,79 @@ unsigned int generateTriStripForceVAO()
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);//GL_STATIC_DRAW);
 
     // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
-    // 0 is the location we specified for our aPos attribute in basic_render.vert
+    // 0 is the location we specified for our aPos attribute in animated_render.vert
+    glVertexAttribPointer(
+            0,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            3 * sizeof(float),
+            (void*)nullptr
+    );
+    glEnableVertexAttribArray(0);
+
+    return VAO;
+}
+
+/**
+ * Performs the OpenGL Dance necessary to summon a vertex array object
+ * describing usage of an element buffer object which in turn holds vertex data
+ * for GL_TRIANGLE_STRIP primitive mode to form a ribbon trail effect.
+ * @return the ID of the vertex array object that can be bound at a later time for rendering use
+ */
+unsigned int generateRibbonTrailVAO()
+{
+    // Config Step 1: create vertex array object to track our config
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);
+    glBindVertexArray(VAO);
+
+    // Config Step 2: define and buffer data
+    // raw rect data, using device coords directly;
+    // these are only the unique vertices of the two triangles!
+    float vertices[] = {
+            // todo: figure out verts
+    };
+    unsigned int indices[] = {
+            // todo: figure out indices
+    };
+
+    // todo: factor out the boilerplate EBO/VBO and common aPos vertex attribute config here into a single function,
+    //  which should take float** and unsigned int** for our verts and indices arrays
+    //  as well as an enum for the desired usage pattern of buffered data (static, dynamic...)
+
+    /// EBO, deals with indices above ///
+    // generate an element buffer object to manage our unique vertices in GPU memory
+    unsigned int EBO;
+    glGenBuffers(1, &EBO);
+
+    // bind our manager EBO to the appropriate type of GPU buffer,
+    // which for element buffer is GL_ELEMENT_ARRAY_BUFFER
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+
+    // upload vertex data to the GPU memory buffer we're working with,
+    // specifying its size in bytes, the data itself as float array, and
+    // finally a constant indicating how often we expect drawable data to change;
+    // since we're rendering a static tri-strip for now, static is fine.
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+
+    /// VBO, deals with vertices defined above ///
+    // generate a vertex buffer object to manage our vertices in GPU memory
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+
+    // bind our manager VBO to the appropriate type of GPU buffer,
+    // which for vertex buffer is GL_ARRAY_BUFFER
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    // upload vertex data to the GPU memory buffer we're working with,
+    // specifying its size in bytes, the data itself as float array, and
+    // finally a constant indicating how often we expect drawable data to change;
+    // since we're rendering a static tri-mesh for now, static is fine.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+    // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
+    // 0 is the location we specified for our aPos attribute in ribbontrail_render.vert
     glVertexAttribPointer(
             0,
             3,
