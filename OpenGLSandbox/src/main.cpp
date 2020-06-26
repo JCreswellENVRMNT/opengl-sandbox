@@ -3,13 +3,64 @@
 #include <GLFW/glfw3.h>
 #include <sstream>
 #include <fstream>
-#include <assert.h>
+#include <cassert>
+#include <functional>
+#include <thread>
 
 enum ShaderType
 {
     vertex,
     fragment
 };
+
+/**
+ * The maximum supported number of draw elements, after which we should reset to init
+ */
+GLsizei  g_maxDrawElements = 0;
+/**
+ * The initial supported number of draw elements
+ */
+GLsizei  g_initDrawElements = 0;
+/**
+ * The number of elements by which the g_numDrawElements should increase each
+ * loop of the animation thread
+ */
+GLsizei  g_stepDrawElements = 0;
+/**
+ * The number of elements we want to draw from our active EBO
+ */
+GLsizei g_numDrawElements = 0;
+/**
+ * This var controls the while loop in the animation thread; if the thread
+ * has been started it'll loop until this var is false
+ */
+bool g_shouldRunAnimationThread = false;
+
+/**
+ * Starts the thread managing progression of elements we'll draw from the active EBO,
+ * updating the number of elements every interval ms
+ * @param periodicFunc the function that be run periodically
+ * @param interval the milliseconds that should elapse between executions of periodicFunc
+ */
+void start_animation(const std::function<void(void)>& periodicFunc, unsigned int interval)
+{
+    g_shouldRunAnimationThread = true;
+    std::thread([periodicFunc, interval]() {
+        while (g_shouldRunAnimationThread)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+            periodicFunc();
+        }
+    }).detach();
+}
+
+/**
+ * Stops the thread managing progression of elements we'll draw from the active EBO
+ */
+void stop_animation()
+{
+    g_shouldRunAnimationThread = false;
+}
 
 /**
  * Callback function for window resize events; we'll tell OpenGL that we need a
@@ -392,13 +443,30 @@ unsigned int generateRibbonTrailVAO()
 
     // Config Step 2: define and buffer data
     // raw rect data, using device coords directly;
-    // these are only the unique vertices of the two triangles!
+    // these are only the unique vertices of the 6 triangles
+    // making up our three quadrilateral ribbon
     float vertices[] = {
-            // todo: figure out verts
+        0.75, -0.75, 1.0,
+        0.65, 0.25, 1.0,
+        0.35, 0.65, 1.0,
+        0.45, -0.35, 1.0,
+        -0.25, 0.0, 1.0,
+        -0.35, 1.0, 1.0,
+        -0.95, 0.75, 1.0,
+        -0.85, -0.25, 1.0
     };
     unsigned int indices[] = {
-            // todo: figure out indices
+        0, 1,
+        3, 2,
+        4, 5,
+        7, 6
     };
+
+    // configure animation via draw element count progression
+    g_maxDrawElements = sizeof(indices)/sizeof(indices[0]);
+    g_initDrawElements = 2;
+    g_stepDrawElements = 2;
+    g_numDrawElements = g_initDrawElements;
 
     // todo: factor out the boilerplate EBO/VBO and common aPos vertex attribute config here into a single function,
     //  which should take float** and unsigned int** for our verts and indices arrays
@@ -417,7 +485,7 @@ unsigned int generateRibbonTrailVAO()
     // specifying its size in bytes, the data itself as float array, and
     // finally a constant indicating how often we expect drawable data to change;
     // since we're rendering a static tri-strip for now, static is fine.
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
     /// VBO, deals with vertices defined above ///
     // generate a vertex buffer object to manage our vertices in GPU memory
@@ -432,10 +500,10 @@ unsigned int generateRibbonTrailVAO()
     // specifying its size in bytes, the data itself as float array, and
     // finally a constant indicating how often we expect drawable data to change;
     // since we're rendering a static tri-mesh for now, static is fine.
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     // Config Step 3: configure vertex attribute pointers to tell OpenGL how to interpret buffered data
-    // 0 is the location we specified for our aPos attribute in ribbontrail_render.vert
+    // 0 is the location we specified for our aPos attribute in basic_render.vert
     glVertexAttribPointer(
             0,
             3,
@@ -490,7 +558,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     // create our program object and load vertex and fragment shaders into it
-    std::string shaderProgramName = "animated_render";
+    std::string shaderProgramName = "basic_render";
     unsigned int shaderProgramId = loadShaders(shaderProgramName);
     assert(shaderProgramId > 0);
 
@@ -501,8 +569,12 @@ int main()
     /*
     unsigned int unqiueVertsRectangleVAO = generateUniqueVertsRectangleVAO();
     */
+    /*
     unsigned int tristripforceVAO = generateTriStripForceVAO();
+    */
+    unsigned int ribbonTrailVAO = generateRibbonTrailVAO();
 
+    /* shader animated demos only
     int timeSpace = glGetUniformLocation(shaderProgramId, "time");
     if(timeSpace < 0)
     {
@@ -510,6 +582,35 @@ int main()
         << shaderProgramName << ". GL error code: " << glGetError() << std::endl;
         return -1;
     }
+    */
+
+    // todo: figure out how to effectively 'erase' historical ribbon frames after
+    //  a certain amount of frames have rendered to give an aging trail effect.
+    //  1. Full data and offsets: Lay out all ribbon frame data in the beginning.  Increase num draw elements until some
+    //     desirable amount (e.g. 4) is reached and then keep it steady.  Then, start calling
+    //     glVertexAttribPointer() afresh in our animation progression functor with an offset that increases
+    //     by g_stepDrawElements each animation interval
+    //  2. Frame data only: buffer only the data we're going to be drawing, rebuffering with an updated
+    //     subset of data each animation interval.
+
+    // advance the number of elements to draw by g_stepDrawElements (starting at g_initDrawElements)
+    //  until g_maxDrawElements is reached, then reset to g_initDrawElements so we get an
+    //  animated ribbon trail effect
+    start_animation(
+            []{
+                if(g_numDrawElements >= g_maxDrawElements)
+                {
+                    // reset
+                    g_numDrawElements = g_initDrawElements;
+                }
+                else
+                {
+                    // step
+                    g_numDrawElements += g_stepDrawElements;
+                }
+            },
+            5000
+    );
 
     // render loop
     while(!glfwWindowShouldClose(window))
@@ -526,10 +627,12 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         // Render Step 2: select shader program to use
         glUseProgram(shaderProgramId);
+        /*
         // set shader program variables
         glUniform1f(timeSpace, glfwGetTime());
+        */
         // Render Step 3: bind the configured VAO
-        glBindVertexArray(tristripforceVAO);
+        glBindVertexArray(ribbonTrailVAO);
         // Render Step 4: draw calls
         // specify primitive type triangles
         /* this is for a basic vertex data config, where every vertex is given in the needed order
@@ -543,10 +646,11 @@ int main()
         // in our EBO which are of type unsigned int
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         */
-        // and that we want to render 9 vertices in total (not just unique), given by the 9 indices
-        // in our EBO which are of type unsigned int
-        glDrawElements(GL_TRIANGLE_STRIP, 9, GL_UNSIGNED_INT, nullptr);
-
+        /*
+        // and that we want to render 8 elements (vert indices)
+        glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_INT, nullptr);
+        */
+        glDrawElements(GL_TRIANGLE_STRIP, g_numDrawElements, GL_UNSIGNED_INT, nullptr);
 #ifdef DEBUG
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
