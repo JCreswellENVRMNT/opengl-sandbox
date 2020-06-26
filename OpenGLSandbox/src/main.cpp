@@ -593,6 +593,9 @@ int main()
     //  2. Frame data only: buffer only the data we're going to be drawing, rebuffering with an updated
     //     subset of data each animation interval.
 
+    // todo: play with modifying ribbon verts in the shader -- they're basically temporal control points,
+    //  giving you the ability to modify the effect at various points in the ribbon's history
+
     // advance the number of elements to draw by g_stepDrawElements (starting at g_initDrawElements)
     //  until g_maxDrawElements is reached, then reset to g_initDrawElements so we get an
     //  animated ribbon trail effect
