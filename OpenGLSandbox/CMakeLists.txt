@@ -16,6 +16,7 @@ include_directories(${GLFW_PATH}/include/)
 add_executable(
         OpenGLSandbox
         src/main.cpp
+        src/RibbonTrail.cpp
         src/glad/glad.c
 )
 add_library(glfw SHARED IMPORTED)

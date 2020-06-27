@@ -1,11 +1,13 @@
 #include <iostream>
 #include "glad/glad.h"
+#include "RibbonTrail.h"
 #include <GLFW/glfw3.h>
 #include <sstream>
 #include <fstream>
 #include <cassert>
 #include <functional>
 #include <thread>
+#include <glm/glm.hpp>
 
 enum ShaderType
 {
@@ -572,9 +574,29 @@ int main()
     /*
     unsigned int tristripforceVAO = generateTriStripForceVAO();
     */
+
     unsigned int ribbonTrailVAO = generateRibbonTrailVAO();
 
-    /* shader animated demos only
+
+    // start off with init anchor verts towards the right of the screen and stretching
+    // from somewhere below the Y axis to somewhere above using device coordinates
+    float initRibbonVerts[] = {
+            0.75, -0.5, 1.0,
+            0.65, 0.5, 1.0
+    };
+
+    // set up RibbonTrail
+    RibbonTrail ribbonTrail(3);
+    //unsigned int dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
+
+    // configure animation timer vars
+    g_maxDrawElements = ribbonTrail.getNumIndices();
+    g_initDrawElements = 2;
+    g_stepDrawElements = 2;
+    g_numDrawElements = g_initDrawElements;
+
+    /*
+    // animated_render shader modifies vert pos and frag color by trig functions over given time
     int timeSpace = glGetUniformLocation(shaderProgramId, "time");
     if(timeSpace < 0)
     {
@@ -591,7 +613,8 @@ int main()
     //     glVertexAttribPointer() afresh in our animation progression functor with an offset that increases
     //     by g_stepDrawElements each animation interval
     //  2. Frame data only: buffer only the data we're going to be drawing, rebuffering with an updated
-    //     subset of data each animation interval.
+    //     subset of data each animation interval.  The advantage here is it illustrates a more realistic
+    //     scenario where we don't know all the places the ribbon trail will go ahead of time.
 
     // todo: play with modifying ribbon verts in the shader -- they're basically temporal control points,
     //  giving you the ability to modify the effect at various points in the ribbon's history
