@@ -16,7 +16,7 @@ void RibbonTrail::addVertexPair(glm::vec3 firstVertex, glm::vec3 secondVertex)
 {
     // figure out if we're at cap, where vertex cap is defined
     //  as our indices count
-    size_t vertCap = 4 + 2*(mNumSegments-1);
+    size_t vertCap = calculateMaxVertexCount();
     if(mVertices.size() >= vertCap)
     {
         // discard the oldest vert pair
@@ -42,22 +42,43 @@ void RibbonTrail::addVertexPair(glm::vec3 firstVertex, glm::vec3 secondVertex)
         size_t vertCount = mVertices.size();
         if((vertCount / 2) % 2)
         {
-            // natural progression; lower idx is vertCount because of 0-based array index
-            mIndices.push_back(vertCount);
-            mIndices.push_back(vertCount + 1);
+            // natural progression; lower idx is vertCount-2 because of 0-based array index
+            mIndices.push_back(vertCount-2);
+            mIndices.push_back(vertCount-1);
         }
         else
         {
             // reverse
-            mIndices.push_back(vertCount + 1);
-            mIndices.push_back(vertCount);
+            mIndices.push_back(vertCount-1);
+            mIndices.push_back(vertCount-2);
         }
     }
 }
 
-size_t RibbonTrail::getNumIndices()
+size_t RibbonTrail::calculateMaxVertexCount() const
 {
-    return mIndices.size();
+    return 4 + 2*(mNumSegments - 1);
+}
+
+size_t RibbonTrail::getVertexCount()
+{
+    return mVertices.size();
+}
+
+void RibbonTrail::resetRibbon()
+{
+    mVertices.clear();
+    mIndices.clear();
+}
+
+void RibbonTrail::invalidateBuffers()
+{
+    mInvalidBuffers = true;
+}
+
+bool RibbonTrail::areBuffersInvalid() const
+{
+    return mInvalidBuffers;
 }
 
 unsigned int RibbonTrail::generateRibbonTrailVAO()

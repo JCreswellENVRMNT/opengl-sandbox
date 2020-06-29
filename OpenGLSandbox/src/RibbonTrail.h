@@ -34,6 +34,11 @@ private:
      * maintain, adding new segments at the head of the ribbon and removing the oldest from the tail
      */
     size_t mNumSegments;
+    /**
+     * Flag indicating that underlying data has been changed and that the render loop
+     * should regenerate the buffers via generateRibbonTrailVAO()
+     */
+    bool mInvalidBuffers = false;
 public:
     /**
      * Construct a new RibbonTrail which will build up to the given number of ribbon segments
@@ -54,9 +59,29 @@ public:
      */
     unsigned int generateRibbonTrailVAO();
     /**
-     * @return the number of vertex indices we'll be buffering into our EBO
+     * @return the total number of vertices we'll need to render the desired segment count
+     *         using tri-strips
      */
-    size_t getNumIndices();
+    size_t calculateMaxVertexCount() const;
+    /**
+     * @return the size of the mVertices deque, which indicates the number of vertices
+     *         that currently comprise this ribbon trail
+     */
+    size_t getVertexCount();
+    /**
+     * Resets mVertices and mIndices containers, emptying the ribbon's structure
+     */
+    void resetRibbon();
+    /**
+     * Raises the mInvalidBuffers flag
+     */
+    void invalidateBuffers();
+    /**
+     * @return true if the VBO and EBO are no longer valid with respect to
+     *         underlying data and need to be updated via a fresh call
+     *         to generateRibbonTrailVAO()
+     */
+    bool areBuffersInvalid() const;
 };
 
 

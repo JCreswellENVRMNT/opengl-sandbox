@@ -574,26 +574,26 @@ int main()
     /*
     unsigned int tristripforceVAO = generateTriStripForceVAO();
     */
-
+    /*
     unsigned int ribbonTrailVAO = generateRibbonTrailVAO();
+    */
 
-
-    // start off with init anchor verts towards the right of the screen and stretching
-    // from somewhere below the Y axis to somewhere above using device coordinates
-    float initRibbonVerts[] = {
-            0.75, -0.5, 1.0,
-            0.65, 0.5, 1.0
+    // set of vertices that will comprise the complete ribbon trail for debug;
+    // we'll add a pair of these in order every tick of the animation function
+    float debugRibbonVertices[] = {
+            0.75, -0.75, 1.0,
+            0.65, 0.25, 1.0,
+            0.35, 0.65, 1.0,
+            0.45, -0.35, 1.0,
+            -0.25, 0.0, 1.0,
+            -0.35, 1.0, 1.0,
+            -0.95, 0.75, 1.0,
+            -0.85, -0.25, 1.0
     };
 
     // set up RibbonTrail
     RibbonTrail ribbonTrail(3);
-    //unsigned int dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
-
-    // configure animation timer vars
-    g_maxDrawElements = ribbonTrail.getNumIndices();
-    g_initDrawElements = 2;
-    g_stepDrawElements = 2;
-    g_numDrawElements = g_initDrawElements;
+    unsigned int dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
 
     /*
     // animated_render shader modifies vert pos and frag color by trig functions over given time
@@ -623,19 +623,42 @@ int main()
     //  until g_maxDrawElements is reached, then reset to g_initDrawElements so we get an
     //  animated ribbon trail effect
     start_animation(
-            []{
-                if(g_numDrawElements >= g_maxDrawElements)
+            [&]{
+                if(ribbonTrail.getVertexCount() >= ribbonTrail.calculateMaxVertexCount())
                 {
                     // reset
-                    g_numDrawElements = g_initDrawElements;
+                    ribbonTrail.resetRibbon();
                 }
-                else
-                {
-                    // step
-                    g_numDrawElements += g_stepDrawElements;
-                }
+
+                // offset in the raw float array of our effective cursor into the
+                // vertex pairs therein
+                size_t currentVertexIdxOffset = ribbonTrail.getVertexCount() * 3;;
+
+                // add vertices drawn from appropriate places in the debug vert array
+                ribbonTrail.addVertexPair(
+                        glm::vec3(
+                                debugRibbonVertices[currentVertexIdxOffset],
+                                debugRibbonVertices[currentVertexIdxOffset+1],
+                                debugRibbonVertices[currentVertexIdxOffset+2]
+                        ),
+                        glm::vec3(
+                                debugRibbonVertices[currentVertexIdxOffset+3],
+                                debugRibbonVertices[currentVertexIdxOffset+4],
+                                debugRibbonVertices[currentVertexIdxOffset+5]
+                        )
+                );
+
+                // todo: I get a segfault when ribbonTrail.generateRibbonTrailVAO()
+                //  calls glGenVertexArrays() from this context -- maybe the function pointers
+                //  glad figures out for us are somehow tied to the thread on which
+                //  gladLoadGLLoader() is called?
+                // UPDATE: ah, this was most likely a problem related to GL context;
+                //  GL contexts ARE thread-specific and we created our current context on the main thread
+                // regenerate our VAO with updated source data
+                //dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
+                ribbonTrail.invalidateBuffers();
             },
-            5000
+            2500
     );
 
     // render loop
@@ -658,7 +681,11 @@ int main()
         glUniform1f(timeSpace, glfwGetTime());
         */
         // Render Step 3: bind the configured VAO
-        glBindVertexArray(ribbonTrailVAO);
+        if(ribbonTrail.areBuffersInvalid())
+        {
+            dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
+        }
+        glBindVertexArray(dynamicRibbonTrailVAO);
         // Render Step 4: draw calls
         // specify primitive type triangles
         /* this is for a basic vertex data config, where every vertex is given in the needed order
@@ -676,7 +703,12 @@ int main()
         // and that we want to render 8 elements (vert indices)
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_INT, nullptr);
         */
-        glDrawElements(GL_TRIANGLE_STRIP, g_numDrawElements, GL_UNSIGNED_INT, nullptr);
+
+        // only draw tris if we have enough elements to support at least one
+        if(ribbonTrail.getVertexCount() >= 3)
+        {
+            glDrawElements(GL_TRIANGLE_STRIP, ribbonTrail.getVertexCount(), GL_UNSIGNED_INT, nullptr);
+        }
 #ifdef DEBUG
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif
