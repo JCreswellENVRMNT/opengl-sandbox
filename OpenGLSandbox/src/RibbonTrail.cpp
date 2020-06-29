@@ -4,67 +4,7 @@
 
 #include "RibbonTrail.h"
 
-RibbonTrail::RibbonTrail(size_t numSegments): mNumSegments(numSegments)
-{
-    // init indices member based on desired number of segments
-    //  A given ribbon segment is a quadrilateral between 4 vertices in the trail.
-    //  Given that plus the fact that we're using tri-strip primitive mode means
-    //  we basically have 2*numSegments triangles, and 4 + 2*(numSegments-1) vertices because
-    //  we need at least 4 unique verts to draw the first segment and then only 2 additional
-    //  ones for each new segment after that.
-    //  The indices progression needs to account for tri-strip as well, basically following
-    //  a pattern of 0, 1, 3, 2, 4, 5, 7, 6... where every other vertex pair's natural traversal order
-    //  is reversed; this is because tri-strip's algorithm draws every three adjacent indices
-    //  as a triangle and for contiguous quadrilaterals each comprised of two contiguous triangles
-    //  this works out to needing an index progression like that given above.
-    // todo: hmm, pretty sure OpenGL won't be happy if we build an EBO with indices that
-    //  point to data that doesn't exist yet... likely will need to build this stuff in
-    //  addVertexPair() along with vertex buffer data
-    for(size_t segmentIdx = 0; segmentIdx < numSegments; segmentIdx++)
-    {
-        // initial 4 for first segment only
-        if(segmentIdx == 0)
-        {
-            mIndices.push_back(0);
-            mIndices.push_back(1);
-            mIndices.push_back(3);
-            mIndices.push_back(2);
-        }
-        else
-        {
-            /*
-             derive indices from segment idx:
-                segment 1 gets 4, 5
-                segment 2 gets 7, 6
-                segment 3 gets 8, 9...
-                number of verts total should match number of indices and
-                is given by 4 + 2 * (numSegments-1).  Since we
-                drop 4 verts for the first segment idx above as a special case,
-                the current indices we need to add are given
-                by 4 + 2 * (segmentIdx - 1) for the lower idx
-                and 4 + 2 * (segmentIdx - 1) + 1 for the higher idx
-                ( - 1 to account for 0 indexing)
-             */
-            // since we know that segment 1 will be back to natural progression and that
-            // every other pair uses reversed progression, we can just check to see if
-            // segment idx is even to determine if progression should be flipped
-            size_t lowerIdx = 4 + 2 * (segmentIdx - 1);
-            if(segmentIdx % 2 == 0)
-            {
-                // reverse
-                mIndices.push_back(lowerIdx + 1);
-                mIndices.push_back(lowerIdx);
-
-            }
-            else
-            {
-                // natural progression
-                mIndices.push_back(lowerIdx);
-                mIndices.push_back(lowerIdx + 1);
-            }
-        }
-    }
-}
+RibbonTrail::RibbonTrail(size_t numSegments): mNumSegments(numSegments){}
 
 // todo: presumably we'll want the ribbon trail to disappear down to nothing when the
 //  attached object stops moving, so some removeOldestVertexPair() function that
@@ -85,12 +25,6 @@ void RibbonTrail::addVertexPair(glm::vec3 firstVertex, glm::vec3 secondVertex)
     }
     mVertices.push_back(firstVertex);
     mVertices.push_back(secondVertex);
-
-    // todo: insert indices following the every other reverse natural order pattern
-    //  We basically only want to populate mIndices completely once, so the population
-    //  op here needs to be conditional on whether or not we already have enough indices to
-    //  direct drawing of our complete vertex element buffer (where complete vert set is defined
-    //  as enough verts to form the input number of quadrilateral segments)
 
     // check if we need to build up indices
     if(mIndices.size() <= vertCap - 2)
@@ -142,10 +76,6 @@ unsigned int RibbonTrail::generateRibbonTrailVAO()
         vertices[vertIdx * 3 + 1] = mVertices[vertIdx].y;
         vertices[vertIdx * 3 + 2] = mVertices[vertIdx].z;
     }
-
-    // todo: consider building the whole mIndices vector up front in the ctor
-    //  and then only pull as many indices as we have verts into a temp indices
-    //  array here that we pass over to OpenGL
     unsigned int* indices = mIndices.data();
 
     /// EBO, deals with indices above ///
