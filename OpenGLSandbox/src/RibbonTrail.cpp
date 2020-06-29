@@ -66,11 +66,18 @@ RibbonTrail::RibbonTrail(size_t numSegments): mNumSegments(numSegments)
     }
 }
 
+// todo: presumably we'll want the ribbon trail to disappear down to nothing when the
+//  attached object stops moving, so some removeOldestVertexPair() function that
+//  gets called at a time interval possibly conditionally on whether addVertexPair() has been
+//  called within that interval (i.e. addVertexPair() resets the clock, such that we can
+//  enforce our segment cap and also support clearing the trail after idle time?)
+
 void RibbonTrail::addVertexPair(glm::vec3 firstVertex, glm::vec3 secondVertex)
 {
     // figure out if we're at cap, where vertex cap is defined
     //  as our indices count
-    if(mVertices.size() >= mIndices.size())
+    size_t vertCap = 4 + 2*(mNumSegments-1);
+    if(mVertices.size() >= vertCap)
     {
         // discard the oldest vert pair
         mVertices.pop_front();
@@ -78,6 +85,40 @@ void RibbonTrail::addVertexPair(glm::vec3 firstVertex, glm::vec3 secondVertex)
     }
     mVertices.push_back(firstVertex);
     mVertices.push_back(secondVertex);
+
+    // todo: insert indices following the every other reverse natural order pattern
+    //  We basically only want to populate mIndices completely once, so the population
+    //  op here needs to be conditional on whether or not we already have enough indices to
+    //  direct drawing of our complete vertex element buffer (where complete vert set is defined
+    //  as enough verts to form the input number of quadrilateral segments)
+
+    // check if we need to build up indices
+    if(mIndices.size() <= vertCap - 2)
+    {
+        // check what order the indices should be added in;
+        // this derives from the following:
+        // 1. the first pair uses natural progression
+        // and every-other pair uses reversed natural progression to accommodate
+        // tri-strips
+        // 2. since we're adding verts only in pairs, dividing current vert count by
+        // 2 gives us the number of pairs we've added
+        // 3. since we're using number of pairs, we're counting from 1 and therefore
+        // we can use check for an even number of pairs to reveal if we need to reverse
+        // natural progression order
+        size_t vertCount = mVertices.size();
+        if((vertCount / 2) % 2)
+        {
+            // natural progression; lower idx is vertCount because of 0-based array index
+            mIndices.push_back(vertCount);
+            mIndices.push_back(vertCount + 1);
+        }
+        else
+        {
+            // reverse
+            mIndices.push_back(vertCount + 1);
+            mIndices.push_back(vertCount);
+        }
+    }
 }
 
 size_t RibbonTrail::getNumIndices()
@@ -101,6 +142,10 @@ unsigned int RibbonTrail::generateRibbonTrailVAO()
         vertices[vertIdx * 3 + 1] = mVertices[vertIdx].y;
         vertices[vertIdx * 3 + 2] = mVertices[vertIdx].z;
     }
+
+    // todo: consider building the whole mIndices vector up front in the ctor
+    //  and then only pull as many indices as we have verts into a temp indices
+    //  array here that we pass over to OpenGL
     unsigned int* indices = mIndices.data();
 
     /// EBO, deals with indices above ///
