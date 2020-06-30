@@ -648,17 +648,12 @@ int main()
                         )
                 );
 
-                // todo: I get a segfault when ribbonTrail.generateRibbonTrailVAO()
-                //  calls glGenVertexArrays() from this context -- maybe the function pointers
-                //  glad figures out for us are somehow tied to the thread on which
-                //  gladLoadGLLoader() is called?
-                // UPDATE: ah, this was most likely a problem related to GL context;
-                //  GL contexts ARE thread-specific and we created our current context on the main thread
-                // regenerate our VAO with updated source data
-                //dynamicRibbonTrailVAO = ribbonTrail.generateRibbonTrailVAO();
+                // set our ribbon buffers invalid so we'll regenerate them
+                // in the render loop back on the thread that owns our
+                // current GL context
                 ribbonTrail.invalidateBuffers();
             },
-            2500
+            1000
     );
 
     // render loop
@@ -704,11 +699,7 @@ int main()
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_INT, nullptr);
         */
 
-        // only draw tris if we have enough elements to support at least one
-        if(ribbonTrail.getVertexCount() >= 3)
-        {
-            glDrawElements(GL_TRIANGLE_STRIP, ribbonTrail.getVertexCount(), GL_UNSIGNED_INT, nullptr);
-        }
+        glDrawElements(GL_TRIANGLE_STRIP, ribbonTrail.getVertexCount(), GL_UNSIGNED_INT, nullptr);
 #ifdef DEBUG
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 #endif

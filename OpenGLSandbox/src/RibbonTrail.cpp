@@ -112,7 +112,12 @@ unsigned int RibbonTrail::generateRibbonTrailVAO()
     // specifying its size in bytes, the data itself as float array, and
     // finally a constant indicating how often we expect drawable data to change;
     // since we're rendering a static tri-strip for now, static is fine.
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            sizeof(unsigned int) * mIndices.size(),
+            indices,
+            GL_STATIC_DRAW
+            );
 
     /// VBO, deals with vertices defined above ///
     // generate a vertex buffer object to manage our vertices in GPU memory
@@ -141,5 +146,7 @@ unsigned int RibbonTrail::generateRibbonTrailVAO()
     );
     glEnableVertexAttribArray(0);
 
+    // lower invalid buffer flag now that we've updated them
+    mInvalidBuffers = false;
     return VAO;
 }
