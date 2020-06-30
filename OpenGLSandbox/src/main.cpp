@@ -8,6 +8,7 @@
 #include <functional>
 #include <thread>
 #include <glm/glm.hpp>
+#include <random>
 
 enum ShaderType
 {
@@ -519,6 +520,27 @@ unsigned int generateRibbonTrailVAO()
     return VAO;
 }
 
+/**
+ * Applies random modification to the given device coord, clamping to
+ * device coord bounds of -1.0 -> 1.0
+ * @param currentCoord device coord to be modified
+ * @return random modification of the input device coord, still in device coord range
+ */
+float randModifiedDeviceCoord(float currentCoord)
+{
+    int baseModifier = rand() % 5;
+    float convertedModifier = static_cast<float>(baseModifier) / 10;
+    // 50% chance flip sign
+    if(rand() % 10 >= 5)
+    {
+        convertedModifier *= -1;
+    }
+    auto outputCoord = glm::clamp<float>(currentCoord + convertedModifier, -1.0, 1.0);
+    std::cout << "current coord " << currentCoord << " modified by " << convertedModifier
+    << " and clamped to yield rand output coord " << outputCoord << std::endl;
+    return outputCoord;
+}
+
 int main()
 {
     // todo: add Google Test unit test support; it would be great if we
@@ -555,6 +577,10 @@ int main()
 
     // tell OpenGL where to place data for the window and what size its dimensions will be
     glViewport(0, 0, 800, 600);
+
+    // configure OpenGL
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // set GLFW callback for window resize events
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -619,6 +645,10 @@ int main()
     // todo: play with modifying ribbon verts in the shader -- they're basically temporal control points,
     //  giving you the ability to modify the effect at various points in the ribbon's history
 
+    /* initialize random seed: */
+    std::random_device randDev;
+    srand(randDev());
+
     // advance the number of elements to draw by g_stepDrawElements (starting at g_initDrawElements)
     //  until g_maxDrawElements is reached, then reset to g_initDrawElements so we get an
     //  animated ribbon trail effect
@@ -637,14 +667,14 @@ int main()
                 // add vertices drawn from appropriate places in the debug vert array
                 ribbonTrail.addVertexPair(
                         glm::vec3(
-                                debugRibbonVertices[currentVertexIdxOffset],
-                                debugRibbonVertices[currentVertexIdxOffset+1],
-                                debugRibbonVertices[currentVertexIdxOffset+2]
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset]),
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+1]),
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+2])
                         ),
                         glm::vec3(
-                                debugRibbonVertices[currentVertexIdxOffset+3],
-                                debugRibbonVertices[currentVertexIdxOffset+4],
-                                debugRibbonVertices[currentVertexIdxOffset+5]
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+3]),
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+4]),
+                            randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+5])
                         )
                 );
 
