@@ -45,7 +45,7 @@ public:
      * and then maintain that number
      * @param numSegments the maximum number of ribbon segments we want to render at a given time
      */
-    RibbonTrail(size_t numSegments);
+    explicit RibbonTrail(size_t numSegments);
     /**
      * Adds a vertex pair to the vertex buffer, dropping the oldest pair if we're already at capacity
      * based on the desired mNumSegments

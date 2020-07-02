@@ -40,6 +40,18 @@ GLsizei g_numDrawElements = 0;
 bool g_shouldRunAnimationThread = false;
 
 /**
+ * Array of mouse click points converted to OpenGL device coords
+ */
+glm::vec2 g_clickBuffer[] = {glm::vec2(0.0F), glm::vec2(0.0F)};
+/**
+ * Tracks the number of mouse clicks we've buffered into the click buffer;
+ * every 2 clicks we'll send the coords as vertices to the ribbon trail and
+ * then reset this count.  Subsequently, new click coords will start overwriting
+ * the values in click buffer
+ */
+unsigned int g_numClickPoints = 0;
+
+/**
  * Starts the thread managing progression of elements we'll draw from the active EBO,
  * updating the number of elements every interval ms
  * @param periodicFunc the function that be run periodically
@@ -80,12 +92,64 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 /**
  * Callback handler for user input
  * @param window GLFW window receiving input
+ * @param ribbonTrail the current ribbon trail object, if any
  */
-void processInput(GLFWwindow *window)
+void processInput(GLFWwindow *window, RibbonTrail& ribbonTrail)
 {
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, true);
+    }
+    else
+    {
+        // todo: I'm hitting multiple frames per actual press event, causing effective multiple
+        //  press events per actual press event.
+        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+        {
+            // determine click location
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            std::cout << "click at " << xpos << "," << ypos << std::endl;
+            int width, height;
+            glfwGetWindowSize(window, &width, &height);
+            std::cout << "window size is " << width << "x" << height << std::endl;
+            float xPercMag = xpos / static_cast<float>(width);
+            float yPercMag = ypos / static_cast<float>(height);
+            std::cout << "therefore x,y magnitude factors are " << xPercMag << "," << yPercMag << std::endl;
+
+            // convert screen coordinate click location to OpenGL device coords
+            float xDeviceCoord = 0.0F;
+            float yDeviceCoord = 0.0F;
+            float halfMagX = 0.5F * static_cast<float>(width);
+            float halfMagY = 0.5F * static_cast<float>(height);
+            xDeviceCoord = (xpos - halfMagX)/halfMagX;
+            yDeviceCoord = 1.0F - (ypos/halfMagY);
+            std::cout << "device coords are " << xDeviceCoord << "," << yDeviceCoord << std::endl;
+
+            // check for completed vert pair from clicks
+            if(g_numClickPoints >= 2)
+            {
+                // push current click buffer vert pair to ribbon trail
+                ribbonTrail.addVertexPair(
+                    glm::vec3(
+                        g_clickBuffer[0],
+                        1.0
+                    ),
+                    glm::vec3(
+                        g_clickBuffer[1],
+                        1.0
+                    )
+                );
+
+                // reset click count
+                g_numClickPoints = 0;
+            }
+
+            // handle current click
+            g_clickBuffer[g_numClickPoints] = glm::vec2(xDeviceCoord, yDeviceCoord);
+            g_numClickPoints++;
+            std::cout << "increasing click points to " << g_numClickPoints << std::endl;
+        }
     }
 }
 
@@ -528,6 +592,7 @@ unsigned int generateRibbonTrailVAO()
  */
 float randModifiedDeviceCoord(float currentCoord)
 {
+    /*
     int baseModifier = rand() % 5;
     float convertedModifier = static_cast<float>(baseModifier) / 10;
     // 50% chance flip sign
@@ -536,9 +601,11 @@ float randModifiedDeviceCoord(float currentCoord)
         convertedModifier *= -1;
     }
     auto outputCoord = glm::clamp<float>(currentCoord + convertedModifier, -1.0, 1.0);
-    std::cout << "current coord " << currentCoord << " modified by " << convertedModifier
-    << " and clamped to yield rand output coord " << outputCoord << std::endl;
+    //std::cout << "current coord " << currentCoord << " modified by " << convertedModifier
+    //<< " and clamped to yield rand output coord " << outputCoord << std::endl;
     return outputCoord;
+    */
+    return currentCoord;
 }
 
 int main()
@@ -614,8 +681,13 @@ int main()
             -0.25, 0.0, 1.0,
             -0.35, 1.0, 1.0,
             -0.95, 0.75, 1.0,
-            -0.85, -0.25, 1.0
+            -0.85, -0.25, 1.0,
+            -1.0, -0.5, 1.0,
+            -1.0, 0.5, 1.0,
+            -0.5, 0.9, 1.0,
+            -0.3, -0.9, 1.0
     };
+    size_t debugVertsProcessed = 0;
 
     // set up RibbonTrail
     RibbonTrail ribbonTrail(3);
@@ -654,15 +726,24 @@ int main()
     //  animated ribbon trail effect
     start_animation(
             [&]{
+                /*
                 if(ribbonTrail.getVertexCount() >= ribbonTrail.calculateMaxVertexCount())
                 {
                     // reset
                     ribbonTrail.resetRibbon();
                 }
+                */
 
                 // offset in the raw float array of our effective cursor into the
                 // vertex pairs therein
-                size_t currentVertexIdxOffset = ribbonTrail.getVertexCount() * 3;;
+                size_t currentVertexIdxOffset = debugVertsProcessed * 3;//ribbonTrail.getVertexCount() * 3;
+                size_t numDebugVertFloats = sizeof(debugRibbonVertices)/sizeof(debugRibbonVertices[0]);
+                if(currentVertexIdxOffset >= numDebugVertFloats)
+                {
+                    // reset debug vert traversal
+                    currentVertexIdxOffset = 0;
+                    debugVertsProcessed = 0;
+                }
 
                 // add vertices drawn from appropriate places in the debug vert array
                 ribbonTrail.addVertexPair(
@@ -677,6 +758,7 @@ int main()
                             randModifiedDeviceCoord(debugRibbonVertices[currentVertexIdxOffset+5])
                         )
                 );
+                debugVertsProcessed+=2;
 
                 // set our ribbon buffers invalid so we'll regenerate them
                 // in the render loop back on the thread that owns our
@@ -690,9 +772,9 @@ int main()
     while(!glfwWindowShouldClose(window))
     {
         // handle any user input this frame
-        processInput(window);
+        processInput(window, ribbonTrail);
 
-        // check and call events and swap the buffers
+        // check and call events
         glfwPollEvents();
 
         // rendering code
